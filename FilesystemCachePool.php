@@ -14,9 +14,8 @@ namespace Cache\Adapter\Filesystem;
 use Cache\Adapter\Common\AbstractCachePool;
 use Cache\Adapter\Common\Exception\InvalidArgumentException;
 use Cache\Adapter\Common\PhpCacheItem;
-use League\Flysystem\FileExistsException;
-use League\Flysystem\FileNotFoundException;
-use League\Flysystem\FilesystemInterface;
+use League\Flysystem\Filesystem;
+use League\Flysystem\FilesystemException;
 
 /**
  * @author Tobias Nyholm <tobias.nyholm@gmail.com>
@@ -24,7 +23,7 @@ use League\Flysystem\FilesystemInterface;
 class FilesystemCachePool extends AbstractCachePool
 {
     /**
-     * @type FilesystemInterface
+     * @type Filesystem
      */
     private $filesystem;
 
@@ -36,15 +35,15 @@ class FilesystemCachePool extends AbstractCachePool
     private $folder;
 
     /**
-     * @param FilesystemInterface $filesystem
-     * @param string              $folder
+     * @param Filesystem $filesystem
+     * @param string $folder
      */
-    public function __construct(FilesystemInterface $filesystem, $folder = 'cache')
+    public function __construct(Filesystem $filesystem, $folder = 'cache')
     {
         $this->folder = $folder;
 
         $this->filesystem = $filesystem;
-        $this->filesystem->createDir($this->folder);
+        $this->filesystem->createDirectory($this->folder);
     }
 
     /**
@@ -68,7 +67,7 @@ class FilesystemCachePool extends AbstractCachePool
             if ($data === false) {
                 return $empty;
             }
-        } catch (FileNotFoundException $e) {
+        } catch (FilesystemException $e) {
             return $empty;
         }
 
@@ -91,8 +90,8 @@ class FilesystemCachePool extends AbstractCachePool
      */
     protected function clearAllObjectsFromCache()
     {
-        $this->filesystem->deleteDir($this->folder);
-        $this->filesystem->createDir($this->folder);
+        $this->filesystem->deleteDirectory($this->folder);
+        $this->filesystem->createDirectory($this->folder);
 
         return true;
     }
@@ -121,14 +120,17 @@ class FilesystemCachePool extends AbstractCachePool
         $file = $this->getFilePath($item->getKey());
         if ($this->filesystem->has($file)) {
             // Update file if it exists
-            return $this->filesystem->update($file, $data);
+            $this->filesystem->write($file, $data);
+
+            return true;
         }
 
         try {
-            return $this->filesystem->write($file, $data);
-        } catch (FileExistsException $e) {
-            // To handle issues when/if race conditions occurs, we try to update here.
-            return $this->filesystem->update($file, $data);
+            $this->filesystem->write($file, $data);
+
+            return true;
+        } catch (FilesystemException $e) {
+            return false;
         }
     }
 
@@ -179,7 +181,7 @@ class FilesystemCachePool extends AbstractCachePool
         $list   = $this->getList($name);
         $list[] = $key;
 
-        return $this->filesystem->update($this->getFilePath($name), serialize($list));
+        $this->filesystem->write($this->getFilePath($name), serialize($list));
     }
 
     /**
@@ -194,7 +196,7 @@ class FilesystemCachePool extends AbstractCachePool
             }
         }
 
-        return $this->filesystem->update($this->getFilePath($name), serialize($list));
+        $this->filesystem->write($this->getFilePath($name), serialize($list));
     }
 
     /**
@@ -205,8 +207,10 @@ class FilesystemCachePool extends AbstractCachePool
     private function forceClear($key)
     {
         try {
-            return $this->filesystem->delete($this->getFilePath($key));
-        } catch (FileNotFoundException $e) {
+            $this->filesystem->delete($this->getFilePath($key));
+
+            return true;
+        } catch (FilesystemException $e) {
             return true;
         }
     }

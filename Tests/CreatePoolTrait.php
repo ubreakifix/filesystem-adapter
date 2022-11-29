@@ -12,8 +12,8 @@
 namespace Cache\Adapter\Filesystem\Tests;
 
 use Cache\Adapter\Filesystem\FilesystemCachePool;
-use League\Flysystem\Adapter\Local;
 use League\Flysystem\Filesystem;
+use League\Flysystem\Local\LocalFilesystemAdapter;
 
 trait CreatePoolTrait
 {
@@ -35,7 +35,7 @@ trait CreatePoolTrait
     private function getFilesystem()
     {
         if ($this->filesystem === null) {
-            $this->filesystem = new Filesystem(new Local(__DIR__.'/cache'.rand(1, 100000)));
+            $this->filesystem = new Filesystem(new LocalFilesystemAdapter(__DIR__.'/cache'.rand(1, 100000)));
         }
 
         return $this->filesystem;
